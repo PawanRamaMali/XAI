@@ -149,6 +149,61 @@ Each of these methods helps visualize how a deep learning model (e.g., **ResNet5
 
 ---
 
+
+### **🔹 Summary of Explainability Methods in XAI**  
+
+This table provides a high-level **comparison of different XAI methods**, including their **type, key approach, best use case, and pros & cons.**  
+
+| **Method**           | **Type**       | **Approach** | **Best For** | **Pros ✅** | **Cons ❌** |
+|----------------------|---------------|-------------|-------------|------------|------------|
+| **CAM (Class Activation Mapping)** | Local | Feature map weighting | **CNNs** | Fast, simple | Requires network modification |
+| **Grad-CAM** | Local | Gradients | **CNNs, Image Classification** | Works on pre-trained models | Can be coarse |
+| **Grad-CAM++** | Local | Improved Gradients | **CNNs, Multiple Objects** | Better localization | More computationally expensive |
+| **Score-CAM** | Local | Perturbation-based | **CNNs (No gradients needed)** | Model-agnostic | Computationally expensive |
+| **LIME** | Local | Perturbation & Surrogate Model | **Any Model, NLP, Tabular, Images** | Model-agnostic | Can be unstable, only local |
+| **SHAP (Shapley Values)** | Local & Global | Game Theory | **Any Model, Global Interpretability** | Fair, consistent feature attribution | Computationally expensive |
+| **Kernel SHAP** | Local & Global | Approximate SHAP | **Large Datasets, ML Models** | Faster than SHAP | Less accurate |
+| **Integrated Gradients** | Local | Gradient-based | **Deep Learning, NLP** | Captures non-linearity | Requires differentiability |
+| **DeepLIFT** | Local | Reference-based Activation Difference | **Deep Learning, Medical AI** | Faster than IG | Requires reference selection |
+| **Permutation Importance** | Global | Feature Shuffling | **Feature Selection, ML Models** | Simple, fast | Doesn't capture feature interactions |
+| **Occlusion Sensitivity** | Local | Masking & Perturbation | **CNNs, Medical Imaging** | Works on any CNN | Computationally expensive |
+| **Contrastive Explanations Method (CEM)** | Local | Contrastive Learning | **Bias Detection, NLP** | Finds minimal feature changes | Computationally expensive |
+| **XGBoost Feature Importance** | Global | Gain-based ranking | **Tree-Based Models** | Built-in, fast | Doesn’t explain interactions |
+
+---
+
+## **🔹 Which Method Should You Use?**
+### **1️⃣ Explaining Deep Learning Models (CNNs & NLP)**
+| Use Case | Best Methods |
+|----------|-------------|
+| **Explaining CNN decisions (Image AI)** | **Grad-CAM, Score-CAM, Occlusion Sensitivity** |
+| **Explaining multiple objects in an image** | **Grad-CAM++, Score-CAM** |
+| **Explaining NLP models** | **Integrated Gradients, DeepLIFT, SHAP** |
+
+### **2️⃣ Explaining Any Machine Learning Model**
+| Use Case | Best Methods |
+|----------|-------------|
+| **Feature Importance for Any Model** | **SHAP, LIME, Permutation Importance** |
+| **Ensuring fairness & bias detection** | **SHAP, CEM, Permutation Importance** |
+| **Explaining ensemble models (XGBoost, Random Forests)** | **SHAP, XGBoost Feature Importance** |
+
+### **3️⃣ Fast Interpretability & Feature Selection**
+| Use Case | Best Methods |
+|----------|-------------|
+| **Quick interpretation of black-box models** | **LIME, SHAP, Kernel SHAP** |
+| **Feature selection for better performance** | **Permutation Importance, SHAP** |
+
+---
+
+## **🔹 Key Takeaways**
+1. **Grad-CAM & Score-CAM** → Best for **CNNs (image models)**.  
+2. **SHAP** → Best for **global & local explanations (fair and consistent)**.  
+3. **LIME** → Good for **fast, local interpretations** but less stable.  
+4. **Integrated Gradients & DeepLIFT** → Best for **deep learning models (NLP, medical AI)**.  
+5. **Permutation Importance** → Simple but effective for **feature selection**.  
+
+---
+
 ## 📜 License
 This project is licensed under the **MIT License**.
 
