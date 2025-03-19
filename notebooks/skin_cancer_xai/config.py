@@ -33,7 +33,7 @@ MODEL_PATH = MODEL_DIR / "skin_cancer_model.pth"
 
 # Training parameters
 BATCH_SIZE = 32
-NUM_EPOCHS = 15
+NUM_EPOCHS = 2
 LEARNING_RATE = 0.001
 SCHEDULER_STEP_SIZE = 7
 SCHEDULER_GAMMA = 0.1

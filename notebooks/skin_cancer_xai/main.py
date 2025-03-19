@@ -27,6 +27,22 @@ from explanation.shap_explainer import apply_shap
 from explanation.cam import apply_cam
 from visualization.clinical_report import generate_clinical_report, compare_explanations
 
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend
+import matplotlib.pyplot as plt
+
+# Override plt.show to save and close instead
+original_show = plt.show
+def custom_show(*args, **kwargs):
+    plt.close()
+plt.show = custom_show
+
+def save_and_close_plot(plt, save_path):
+    """Save plot to disk and close it without displaying."""
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=100, bbox_inches='tight')
+    plt.close()
 
 def parse_args():
     """Parse command line arguments."""
@@ -110,7 +126,8 @@ def main():
         visualize_augmentations(metadata_path, images_dir)
     
     # Get data loaders (needed for training and evaluation)
-    if set(modes) & set(['train', 'evaluate']):
+    # Get data loaders (needed for training and evaluation)
+    if set(modes) & set(['train', 'evaluate', 'explain']):  # Add 'explain' here
         train_loader, val_loader, class_to_idx = get_data_loaders(
             metadata_path, images_dir
         )
@@ -144,7 +161,7 @@ def main():
         # Fine-tune model
         fine_tuned_model, ft_history = fine_tune_model(
             trained_model, train_loader, val_loader,
-            layers_to_unfreeze=[-20, -15, -10, -5],  # Unfreeze last few layers
+            layers_to_unfreeze=[3, 4, 5],  # Unfreeze layer1, layer2, layer3 (from 0-indexed list)
             device=device
         )
         

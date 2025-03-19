@@ -252,7 +252,7 @@ class GradCAM:
 
 
 def apply_gradcam(model, image_tensor, original_image, target_class=None, 
-                 target_layer=None, save_path=None):
+                 target_layer=None, save_path=None, device=None):
     """
     Apply Grad-CAM to an image.
     
