@@ -23,7 +23,7 @@ for directory in [DATA_DIR, OUTPUT_DIR, MODEL_DIR, RESULTS_DIR]:
     directory.mkdir(parents=True, exist_ok=True)
 
 # Example image path for demonstrations
-EXAMPLE_IMG_PATH = DATA_DIR / "example_melanoma.jpg"
+EXAMPLE_IMG_PATH = DATA_DIR / "example_test.jpg"
 
 # Model parameters
 MODEL_NAME = "resnet50"  # Options: "resnet50", "efficientnet_b0", "densenet121"

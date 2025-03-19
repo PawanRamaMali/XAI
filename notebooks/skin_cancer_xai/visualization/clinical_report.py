@@ -1,8 +1,9 @@
 """
-Updated clinical_report.py to use Captum-based Grad-CAM implementation.
+Improved clinical_report.py with better formatting and layout.
 
-This module integrates the Captum-based Grad-CAM implementation into the
-clinical report generation pipeline for better explainability.
+This module generates clinical reports with improved formatting, ensuring text 
+doesn't overlap with images and providing side-by-side comparisons of original 
+images with each explanation method.
 """
 
 import os
@@ -20,12 +21,16 @@ import sys
 sys.path.append('..')
 from config import OUTPUT_DIR, DPI, COLORMAP, OVERLAY_ALPHA
 
+import time
+
 # Import the Captum-based Grad-CAM implementation
 from explanation.captum_gradcam import apply_captum_gradcam
 from explanation.lime_explainer import apply_lime
 from explanation.integrated_gradients import apply_integrated_gradients
 from explanation.shap_explainer import apply_shap
 from explanation.cam import apply_cam
+
+# from explanation.dermaxai import apply_dermaxai, compare_with_standard_methods
 
 
 def compare_explanations(model, image_tensor, original_image, target_class=None, 
@@ -60,33 +65,30 @@ def compare_explanations(model, image_tensor, original_image, target_class=None,
             output = model(image_tensor.to(device))
             confidence = F.softmax(output, dim=1)[0, target_class].item()
     
-    # Create a figure
-    plt.figure(figsize=(20, 10))
+    # Dictionary to store all explanation methods results
+    explanations = {}
     
     # Original image
-    plt.subplot(2, 3, 1)
-    plt.imshow(original_image)
-    plt.title(f"Original Image\nClass: {target_class} ({confidence:.2f})")
-    plt.axis('off')
+    explanations['original'] = {
+        'title': f"Original Image\nClass: {target_class} ({confidence:.2f})",
+        'image': original_image
+    }
     
-    # Try Captum Grad-CAM (our new implementation)
+    # Try Captum Grad-CAM
     try:
         print("Applying Captum Grad-CAM for comparison...")
         gradcam_heatmap, gradcam_overlay = apply_captum_gradcam(
             model, image_tensor, original_image, 
             target_class=target_class, device=device
         )
-        
-        plt.subplot(2, 3, 2)
-        plt.imshow(gradcam_overlay)
-        plt.title("Captum Grad-CAM")
-        plt.axis('off')
+        explanations['gradcam'] = {
+            'title': "Captum Grad-CAM",
+            'image': gradcam_overlay,
+            'heatmap': gradcam_heatmap
+        }
     except Exception as e:
         print(f"Error applying Captum Grad-CAM for comparison: {e}")
-        plt.subplot(2, 3, 2)
-        plt.text(0.5, 0.5, "Grad-CAM not available", 
-                 ha='center', va='center', transform=plt.gca().transAxes)
-        plt.axis('off')
+        explanations['gradcam'] = None
     
     # Try LIME
     try:
@@ -95,17 +97,13 @@ def compare_explanations(model, image_tensor, original_image, target_class=None,
             model, original_image, 
             target_class=target_class, device=device
         )
-        
-        plt.subplot(2, 3, 3)
-        plt.imshow(lime_viz)
-        plt.title("LIME")
-        plt.axis('off')
+        explanations['lime'] = {
+            'title': "LIME",
+            'image': lime_viz
+        }
     except Exception as e:
         print(f"Error applying LIME for comparison: {e}")
-        plt.subplot(2, 3, 3)
-        plt.text(0.5, 0.5, "LIME not available", 
-                 ha='center', va='center', transform=plt.gca().transAxes)
-        plt.axis('off')
+        explanations['lime'] = None
     
     # Try Integrated Gradients
     try:
@@ -128,16 +126,14 @@ def compare_explanations(model, image_tensor, original_image, target_class=None,
         ig_overlay = (1 - OVERLAY_ALPHA) * original_image + OVERLAY_ALPHA * ig_heatmap_resized
         ig_overlay = np.clip(ig_overlay, 0, 1)
         
-        plt.subplot(2, 3, 4)
-        plt.imshow(ig_overlay)
-        plt.title("Integrated Gradients")
-        plt.axis('off')
+        explanations['integrated_gradients'] = {
+            'title': "Integrated Gradients",
+            'image': ig_overlay,
+            'heatmap': ig_attrs
+        }
     except Exception as e:
         print(f"Error applying Integrated Gradients for comparison: {e}")
-        plt.subplot(2, 3, 4)
-        plt.text(0.5, 0.5, "Integrated Gradients not available", 
-                 ha='center', va='center', transform=plt.gca().transAxes)
-        plt.axis('off')
+        explanations['integrated_gradients'] = None
     
     # Try CAM
     try:
@@ -147,16 +143,39 @@ def compare_explanations(model, image_tensor, original_image, target_class=None,
             target_class=target_class, device=device
         )
         
-        plt.subplot(2, 3, 5)
-        plt.imshow(cam_overlay)
-        plt.title("Class Activation Mapping")
-        plt.axis('off')
+        explanations['cam'] = {
+            'title': "Class Activation Mapping",
+            'image': cam_overlay,
+            'heatmap': cam_heatmap
+        }
     except Exception as e:
         print(f"Error applying CAM for comparison: {e}")
-        plt.subplot(2, 3, 5)
-        plt.text(0.5, 0.5, "CAM not available", 
-                 ha='center', va='center', transform=plt.gca().transAxes)
-        plt.axis('off')
+        explanations['cam'] = None
+
+
+    # # Try DermaXAI
+    # try:
+    #     print("Applying DermaXAI for comparison...")
+    #     dermaxai_explanation, dermaxai_overlay = apply_dermaxai(
+    #         model, image_tensor, original_image,
+    #         target_class=target_class, device=device
+    #     )
+        
+    #     explanations['dermaxai'] = {
+    #         'title': "DermaXAI",
+    #         'image': dermaxai_overlay,
+    #         'heatmap': dermaxai_explanation['final_attribution'],
+    #         'boundary_image': dermaxai_explanation['boundary_image'],
+    #         'color_variations': dermaxai_explanation['color_variations'],
+    #         'texture_features': dermaxai_explanation['texture_features']
+    #     }
+    #     completed += 1
+    #     print(f"Progress: {completed}/{total_methods} explanation methods - DermaXAI completed")
+    # except Exception as e:
+    #     print(f"Error applying DermaXAI for comparison: {e}")
+    #     explanations['dermaxai'] = None
+    #     completed += 1
+    #     print(f"Progress: {completed}/{total_methods} explanation methods - DermaXAI failed")
     
     # Try SHAP (if image is small enough)
     if image_tensor.shape[2] * image_tensor.shape[3] < 150*150:
@@ -182,31 +201,145 @@ def compare_explanations(model, image_tensor, original_image, target_class=None,
             shap_overlay = (1 - OVERLAY_ALPHA) * original_image + OVERLAY_ALPHA * shap_heatmap_resized
             shap_overlay = np.clip(shap_overlay, 0, 1)
             
-            plt.subplot(2, 3, 6)
-            plt.imshow(shap_overlay)
-            plt.title("SHAP")
-            plt.axis('off')
+            explanations['shap'] = {
+                'title': "SHAP",
+                'image': shap_overlay,
+                'heatmap': shap_heatmap
+            }
         except Exception as e:
             print(f"Error applying SHAP for comparison: {e}")
-            plt.subplot(2, 3, 6)
-            plt.text(0.5, 0.5, "SHAP not available", 
-                     ha='center', va='center', transform=plt.gca().transAxes)
-            plt.axis('off')
+            explanations['shap'] = None
     else:
-        plt.subplot(2, 3, 6)
-        plt.text(0.5, 0.5, "SHAP not available\n(image too large)", 
-                 ha='center', va='center', transform=plt.gca().transAxes)
+        explanations['shap'] = None
+    
+    # Create a multi-page PDF with each method on a separate page
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        with PdfPages(save_path) as pdf:
+            # Overview page with all methods
+            plt.figure(figsize=(12, 10))
+            plt.suptitle("Comparison of Explanation Methods", fontsize=16)
+            
+            # Define the grid layout
+            methods = ['gradcam', 'lime', 'integrated_gradients', 'cam', 'shap']
+            available_methods = [m for m in methods if explanations[m] is not None]
+            
+            # First, show the original image
+            plt.subplot(3, 2, 1)
+            plt.imshow(original_image)
+            plt.title(explanations['original']['title'])
+            plt.axis('off')
+            
+            # Then show available explanation methods
+            for i, method in enumerate(available_methods[:5]):  # Limit to 5 methods
+                plt.subplot(3, 2, i+2)
+                plt.imshow(explanations[method]['image'])
+                plt.title(explanations[method]['title'])
+                plt.axis('off')
+            
+            plt.tight_layout()
+            pdf.savefig()
+            plt.close()
+            
+            # Individual pages for each method with side-by-side comparison
+            for method in methods:
+                if explanations[method] is not None:
+                    plt.figure(figsize=(12, 6))
+                    plt.suptitle(f"{explanations[method]['title']} Explanation", fontsize=16)
+                    
+                    # Original image
+                    plt.subplot(1, 2, 1)
+                    plt.imshow(original_image)
+                    plt.title("Original Image")
+                    plt.axis('off')
+                    
+                    # Explanation
+                    plt.subplot(1, 2, 2)
+                    plt.imshow(explanations[method]['image'])
+                    plt.title(explanations[method]['title'])
+                    plt.axis('off')
+                    
+                    # Add description
+                    method_descriptions = {
+                        'gradcam': "Grad-CAM uses the gradients flowing into the final convolutional layer to highlight important regions in the image for the predicted class.",
+                        'lime': "LIME perturbs the input by turning segments on or off, then fits a simple model to approximate how segments affect prediction.",
+                        'integrated_gradients': "Integrated Gradients computes the path integral of gradients along a straight line from a baseline to the input image.",
+                        'cam': "Class Activation Mapping visualizes the class-specific feature maps in the last convolutional layer.",
+                        'shap': "SHAP (SHapley Additive exPlanations) computes the contribution of each feature to the prediction using game theory principles."
+                    }
+                    
+                    plt.figtext(0.1, 0.02, method_descriptions.get(method, ""), wrap=True, fontsize=10)
+                    
+                    plt.tight_layout(rect=[0, 0.1, 1, 0.95])
+                    pdf.savefig()
+                    plt.close()
+                    
+                    # If method has a heatmap, show it on a separate page
+                    if 'heatmap' in explanations[method]:
+                        plt.figure(figsize=(12, 6))
+                        plt.suptitle(f"{explanations[method]['title']} Heatmap Analysis", fontsize=16)
+                        
+                        # Original image
+                        plt.subplot(1, 3, 1)
+                        plt.imshow(original_image)
+                        plt.title("Original Image")
+                        plt.axis('off')
+                        
+                        # Heatmap
+                        plt.subplot(1, 3, 2)
+                        if method == 'integrated_gradients':
+                            plt.imshow(explanations[method]['heatmap'], cmap=COLORMAP)
+                        else:
+                            plt.imshow(explanations[method]['heatmap'], cmap=COLORMAP)
+                        plt.title(f"{explanations[method]['title']} Heatmap")
+                        plt.axis('off')
+                        
+                        # Overlay
+                        plt.subplot(1, 3, 3)
+                        plt.imshow(explanations[method]['image'])
+                        plt.title("Overlay")
+                        plt.axis('off')
+                        
+                        plt.tight_layout(rect=[0, 0.1, 1, 0.95])
+                        pdf.savefig()
+                        plt.close()
+    
+    # Create the comparison figure for display
+    plt.figure(figsize=(20, 10))
+    
+    # Original image
+    plt.subplot(2, 3, 1)
+    plt.imshow(original_image)
+    plt.title(explanations['original']['title'])
+    plt.axis('off')
+    
+    # Add explanation methods
+    methods = ['gradcam', 'lime', 'integrated_gradients', 'cam', 'shap']
+    positions = [(2, 3, 2), (2, 3, 3), (2, 3, 4), (2, 3, 5), (2, 3, 6)]
+    
+    for method, position in zip(methods, positions):
+        plt.subplot(*position)
+        
+        if explanations[method] is not None:
+            plt.imshow(explanations[method]['image'])
+            plt.title(explanations[method]['title'])
+        else:
+            # Display message if method not available
+            method_name = method.replace('_', ' ').title()
+            plt.text(0.5, 0.5, f"{method_name} not available", 
+                    ha='center', va='center', transform=plt.gca().transAxes)
+        
         plt.axis('off')
     
     plt.suptitle("Comparison of Explanation Methods", fontsize=16)
     plt.tight_layout()
     
-    if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path, dpi=DPI, bbox_inches='tight')
-    
     plt.show()
 
+
+"""
+Modified section of generate_clinical_report function with progress tracking.
+"""
 
 def generate_clinical_report(model, image_tensor, original_image, original_path=None,
                           class_names=None, device=None, output_dir=OUTPUT_DIR,
@@ -271,6 +404,161 @@ def generate_clinical_report(model, image_tensor, original_image, original_path=
     # Generate explanations
     print("Generating explanations for the report...")
     
+    # Dictionary to store all explanation methods results
+    explanations = {}
+    
+    # Original image
+    explanations['original'] = {
+        'title': "Original Image",
+        'image': original_image
+    }
+    
+    # Add progress tracking
+    total_methods = 4  # gradcam, lime, integrated_gradients, cam
+    if image_tensor.shape[2] * image_tensor.shape[3] < 150*150:
+        total_methods += 1  # Add SHAP if image is small enough
+    
+    completed = 0
+    print(f"Progress: {completed}/{total_methods} explanation methods")
+    
+    # Try Captum Grad-CAM
+    try:
+        print("Applying Captum Grad-CAM...")
+        gradcam_heatmap, gradcam_overlay = apply_captum_gradcam(
+            model, image_tensor, original_image, 
+            target_class=pred_class, device=device
+        )
+        explanations['gradcam'] = {
+            'title': "Grad-CAM Explanation",
+            'image': gradcam_overlay,
+            'heatmap': gradcam_heatmap
+        }
+        completed += 1
+        print(f"Progress: {completed}/{total_methods} explanation methods - Grad-CAM completed")
+    except Exception as e:
+        print(f"Error applying Captum Grad-CAM: {e}")
+        explanations['gradcam'] = None
+        completed += 1
+        print(f"Progress: {completed}/{total_methods} explanation methods - Grad-CAM failed")
+    
+    # Try LIME
+    try:
+        print("Applying LIME...")
+        lime_exp, lime_viz = apply_lime(
+            model, original_image, 
+            target_class=pred_class, device=device
+        )
+        explanations['lime'] = {
+            'title': "LIME Explanation",
+            'image': lime_viz
+        }
+        completed += 1
+        print(f"Progress: {completed}/{total_methods} explanation methods - LIME completed")
+    except Exception as e:
+        print(f"Error applying LIME: {e}")
+        explanations['lime'] = None
+        completed += 1
+        print(f"Progress: {completed}/{total_methods} explanation methods - LIME failed")
+    
+    # Try Integrated Gradients
+    try:
+        print("Applying Integrated Gradients...")
+        ig_attrs = apply_integrated_gradients(
+            model, image_tensor, original_image,
+            target_class=pred_class, device=device
+        )
+        
+        # Create visualization
+        cmap = plt.get_cmap(COLORMAP)
+        ig_heatmap = cmap(ig_attrs)[:, :, :3]
+        
+        # Resize to match original image
+        ig_heatmap_resized = cv2.resize(
+            ig_heatmap, (original_image.shape[1], original_image.shape[0])
+        )
+        
+        # Create overlay
+        ig_overlay = (1 - OVERLAY_ALPHA) * original_image + OVERLAY_ALPHA * ig_heatmap_resized
+        ig_overlay = np.clip(ig_overlay, 0, 1)
+        
+        explanations['integrated_gradients'] = {
+            'title': "Integrated Gradients Explanation",
+            'image': ig_overlay,
+            'heatmap': ig_attrs
+        }
+        completed += 1
+        print(f"Progress: {completed}/{total_methods} explanation methods - Integrated Gradients completed")
+    except Exception as e:
+        print(f"Error applying Integrated Gradients: {e}")
+        explanations['integrated_gradients'] = None
+        completed += 1
+        print(f"Progress: {completed}/{total_methods} explanation methods - Integrated Gradients failed")
+    
+    # Try CAM
+    try:
+        print("Applying Class Activation Mapping...")
+        cam_heatmap, cam_overlay = apply_cam(
+            model, image_tensor, original_image,
+            target_class=pred_class, device=device
+        )
+        
+        explanations['cam'] = {
+            'title': "Class Activation Mapping",
+            'image': cam_overlay,
+            'heatmap': cam_heatmap
+        }
+        completed += 1
+        print(f"Progress: {completed}/{total_methods} explanation methods - CAM completed")
+    except Exception as e:
+        print(f"Error applying CAM: {e}")
+        explanations['cam'] = None
+        completed += 1
+        print(f"Progress: {completed}/{total_methods} explanation methods - CAM failed")
+    
+    # Try SHAP (if image is small enough)
+    if image_tensor.shape[2] * image_tensor.shape[3] < 150*150:
+        try:
+            print("Applying SHAP...")
+            shap_values = apply_shap(
+                model, image_tensor, original_image,
+                target_class=pred_class, device=device
+            )
+            
+            # Use the SHAP values to create a visualization
+            cmap = plt.get_cmap(COLORMAP)
+            shap_heatmap = np.abs(shap_values).sum(axis=1)[0]
+            shap_heatmap = shap_heatmap / np.max(shap_heatmap)
+            shap_heatmap_rgb = cmap(shap_heatmap)[:, :, :3]
+            
+            # Resize to match original image
+            shap_heatmap_resized = cv2.resize(
+                shap_heatmap_rgb, (original_image.shape[1], original_image.shape[0])
+            )
+            
+            # Create overlay
+            shap_overlay = (1 - OVERLAY_ALPHA) * original_image + OVERLAY_ALPHA * shap_heatmap_resized
+            shap_overlay = np.clip(shap_overlay, 0, 1)
+            
+            explanations['shap'] = {
+                'title': "SHAP",
+                'image': shap_overlay,
+                'heatmap': shap_heatmap
+            }
+            completed += 1
+            print(f"Progress: {completed}/{total_methods} explanation methods - SHAP completed")
+        except Exception as e:
+            print(f"Error applying SHAP: {e}")
+            explanations['shap'] = None
+            completed += 1
+            print(f"Progress: {completed}/{total_methods} explanation methods - SHAP failed")
+    else:
+        print("Skipping SHAP explanation due to large image size.")
+    
+    print("All explanation methods processed. Generating PDF reports...")
+    
+    # Create summary PDF
+    # ... rest of the function remains the same
+    
     # Create summary PDF
     with PdfPages(summary_path) as pdf:
         # Summary page
@@ -283,7 +571,7 @@ def generate_clinical_report(model, image_tensor, original_image, original_path=
         plt.figtext(0.1, 0.90, f"Model: {model.__class__.__name__}", fontsize=10)
         
         # Create grid for layout
-        gs = gridspec.GridSpec(3, 2, height_ratios=[1, 1.5, 1])
+        gs = gridspec.GridSpec(3, 2, height_ratios=[1, 1.5, 1], hspace=0.4)
         
         # Original image
         ax1 = plt.subplot(gs[0, 0])
@@ -305,41 +593,25 @@ def generate_clinical_report(model, image_tensor, original_image, original_path=
         for i, prob in enumerate(top_probs):
             ax2.text(prob + 0.01, i, f"{prob:.2f}", va='center')
         
-        # Try to get Captum Grad-CAM explanation
-        try:
-            gradcam_heatmap, gradcam_overlay = apply_captum_gradcam(
-                model, image_tensor, original_image, 
-                target_class=pred_class, device=device
-            )
-            
-            ax3 = plt.subplot(gs[1, 0])
-            ax3.imshow(gradcam_overlay)
+        # First explanation method (Grad-CAM if available)
+        ax3 = plt.subplot(gs[1, 0])
+        if explanations['gradcam'] is not None:
+            ax3.imshow(explanations['gradcam']['image'])
             ax3.set_title("Grad-CAM Explanation")
-            ax3.axis('off')
-        except Exception as e:
-            print(f"Error applying Captum Grad-CAM: {e}")
-            ax3 = plt.subplot(gs[1, 0])
+        else:
             ax3.text(0.5, 0.5, "Grad-CAM explanation\nnot available", 
                     ha='center', va='center', transform=ax3.transAxes)
-            ax3.axis('off')
+        ax3.axis('off')
         
-        # Try to get LIME explanation
-        try:
-            lime_exp, lime_viz = apply_lime(
-                model, original_image, 
-                target_class=pred_class, device=device
-            )
-            
-            ax4 = plt.subplot(gs[1, 1])
-            ax4.imshow(lime_viz)
+        # Second explanation method (LIME if available)
+        ax4 = plt.subplot(gs[1, 1])
+        if explanations['lime'] is not None:
+            ax4.imshow(explanations['lime']['image'])
             ax4.set_title("LIME Explanation")
-            ax4.axis('off')
-        except Exception as e:
-            print(f"Error applying LIME: {e}")
-            ax4 = plt.subplot(gs[1, 1])
+        else:
             ax4.text(0.5, 0.5, "LIME explanation\nnot available", 
                     ha='center', va='center', transform=ax4.transAxes)
-            ax4.axis('off')
+        ax4.axis('off')
         
         # Add conclusion and recommendations
         ax5 = plt.subplot(gs[2, :])
@@ -389,13 +661,22 @@ def generate_clinical_report(model, image_tensor, original_image, original_path=
         
         # Prediction results
         plt.subplot(2, 2, 2)
+        classes = np.arange(len(class_names))
+        probs_np = probs[0].cpu().numpy()
+        sorted_indices = np.argsort(probs_np)[::-1]  # Sort in descending order
+        
         plt.barh(
-            [class_names[idx] for idx in range(len(class_names))],
-            probs[0].cpu().numpy(),
+            [class_names[idx] for idx in sorted_indices],
+            [probs_np[idx] for idx in sorted_indices],
             color='skyblue'
         )
         plt.title("Full Prediction Confidence")
         plt.xlim(0, 1)
+        
+        # Add values to bars
+        for i, idx in enumerate(sorted_indices):
+            if probs_np[idx] > 0.01:  # Only add text for non-tiny values
+                plt.text(probs_np[idx] + 0.01, i, f"{probs_np[idx]:.3f}", va='center')
         
         # Add metadata
         plt.subplot(2, 1, 2)
@@ -418,171 +699,152 @@ def generate_clinical_report(model, image_tensor, original_image, original_path=
         pdf.savefig()
         plt.close()
         
-        # Explanations page - Grad-CAM and LIME
+        # Individual pages for each explanation method
+        explanation_methods = [
+            ('gradcam', "Grad-CAM Explanation", 
+             "Grad-CAM (Gradient-weighted Class Activation Mapping) uses the gradients flowing into the final convolutional layer to highlight important regions in the image for the predicted class. Brighter areas indicate regions that strongly influenced the prediction."),
+            
+            ('lime', "LIME Explanation",
+             "LIME (Local Interpretable Model-agnostic Explanations) perturbs the input image by segmenting it and turning segments on or off. It then fits a simple model to approximate how the segments affect the model's prediction. Green regions positively contribute to the prediction, while red regions negatively contribute."),
+            
+            ('integrated_gradients', "Integrated Gradients Explanation",
+             "Integrated Gradients computes the path integral of the gradients along a straight line from a baseline image (usually black) to the input image. This provides a pixel-level attribution map showing the contribution of each pixel to the prediction."),
+            
+            ('cam', "Class Activation Mapping",
+             "Class Activation Mapping (CAM) visualizes the class-specific feature maps in the last convolutional layer. It shows which regions of the image were most important for the model's prediction of the specific class.")
+        ]
+        
+        for method, title, description in explanation_methods:
+            if explanations[method] is not None:
+                plt.figure(figsize=(8.5, 11))
+                plt.suptitle(title, fontsize=16, y=0.98)
+                
+                # Side by side comparison of original and explanation
+                plt.subplot(2, 2, 1)
+                plt.imshow(original_image)
+                plt.title("Original Image")
+                plt.axis('off')
+                
+                plt.subplot(2, 2, 2)
+                plt.imshow(explanations[method]['image'])
+                plt.title(explanations[method]['title'])
+                plt.axis('off')
+                
+                # Add heatmap if available
+                if 'heatmap' in explanations[method]:
+                    plt.subplot(2, 2, 3)
+                    plt.imshow(explanations[method]['heatmap'], cmap=COLORMAP)
+                    plt.title(f"{title} Heatmap")
+                    plt.axis('off')
+                
+                # Add text area for description
+                ax_text = plt.subplot(2, 2, 4) if 'heatmap' in explanations[method] else plt.subplot(2, 1, 2)
+                ax_text.axis('off')
+                
+                ax_text.text(0.5, 0.8, "Description:", fontsize=12, weight='bold', ha='center')
+                ax_text.text(0.5, 0.6, description, fontsize=10, ha='center', va='center', wrap=True)
+                
+                plt.tight_layout(rect=[0, 0, 1, 0.95])
+                pdf.savefig()
+                plt.close()
+        
+        # Try SHAP (if image is small enough)
+        if image_tensor.shape[2] * image_tensor.shape[3] < 150*150:
+            try:
+                shap_values = apply_shap(
+                    model, image_tensor, original_image,
+                    target_class=pred_class, device=device
+                )
+                
+                # Use the SHAP values to create a visualization
+                cmap = plt.get_cmap(COLORMAP)
+                shap_heatmap = np.abs(shap_values).sum(axis=1)[0]
+                shap_heatmap = shap_heatmap / np.max(shap_heatmap)
+                shap_heatmap_rgb = cmap(shap_heatmap)[:, :, :3]
+                
+                # Resize to match original image
+                shap_heatmap_resized = cv2.resize(
+                    shap_heatmap_rgb, (original_image.shape[1], original_image.shape[0])
+                )
+                
+                # Create overlay
+                shap_overlay = (1 - OVERLAY_ALPHA) * original_image + OVERLAY_ALPHA * shap_heatmap_resized
+                shap_overlay = np.clip(shap_overlay, 0, 1)
+                
+                # Create SHAP explanation page
+                plt.figure(figsize=(8.5, 11))
+                plt.suptitle("SHAP Explanation", fontsize=16, y=0.98)
+                
+                plt.subplot(2, 2, 1)
+                plt.imshow(original_image)
+                plt.title("Original Image")
+                plt.axis('off')
+                
+                plt.subplot(2, 2, 2)
+                plt.imshow(shap_overlay)
+                plt.title("SHAP Overlay")
+                plt.axis('off')
+                
+                plt.subplot(2, 2, 3)
+                plt.imshow(shap_heatmap, cmap=COLORMAP)
+                plt.title("SHAP Heatmap")
+                plt.axis('off')
+                
+                # Add text description
+                ax_text = plt.subplot(2, 2, 4)
+                ax_text.axis('off')
+                
+                shap_description = (
+                    "SHAP (SHapley Additive exPlanations) computes the contribution "
+                    "of each feature to the prediction using game theory principles. "
+                    "It helps understand how each pixel contributes to pushing the "
+                    "prediction toward or away from a particular class."
+                )
+                
+                ax_text.text(0.5, 0.8, "Description:", fontsize=12, weight='bold', ha='center')
+                ax_text.text(0.5, 0.6, shap_description, fontsize=10, ha='center', va='center', wrap=True)
+                
+                plt.tight_layout(rect=[0, 0, 1, 0.95])
+                pdf.savefig()
+                plt.close()
+                
+            except Exception as e:
+                print(f"Error applying SHAP for report: {e}")
+        else:
+            print("Skipping SHAP explanation due to large image size.")
+        
+        # Comparison of all methods on one page
         plt.figure(figsize=(8.5, 11))
-        plt.suptitle("Explanation Methods - Part 1", fontsize=16, y=0.98)
+        plt.suptitle("Comparison of All Explanation Methods", fontsize=16, y=0.98)
         
-        # Try Captum Grad-CAM
-        try:
-            gradcam_heatmap, gradcam_overlay = apply_captum_gradcam(
-                model, image_tensor, original_image, 
-                target_class=pred_class, device=device
-            )
-            
-            plt.subplot(2, 2, 1)
-            plt.imshow(gradcam_overlay)
-            plt.title("Captum Grad-CAM Explanation")
-            plt.axis('off')
-            
-            plt.subplot(2, 2, 2)
-            plt.imshow(gradcam_heatmap, cmap=COLORMAP)
-            plt.title("Grad-CAM Heatmap")
-            plt.axis('off')
-            
-            gradcam_description = (
-                "Grad-CAM (Gradient-weighted Class Activation Mapping) uses the "
-                "gradients flowing into the final convolutional layer to highlight "
-                "important regions in the image for the predicted class. Brighter "
-                "areas indicate regions that strongly influenced the prediction."
-            )
-            
-            plt.figtext(0.1, 0.55, "Grad-CAM Explanation:", fontsize=12, weight='bold')
-            plt.figtext(0.1, 0.5, gradcam_description, fontsize=10, wrap=True)
-            
-        except Exception as e:
-            print(f"Error applying Grad-CAM for report: {e}")
-            plt.subplot(2, 2, 1)
-            plt.text(0.5, 0.5, "Grad-CAM explanation\nnot available", 
-                    ha='center', va='center', transform=plt.gca().transAxes)
-            plt.axis('off')
-            
-            plt.subplot(2, 2, 2)
-            plt.axis('off')
+        # Create a grid layout
+        gs = gridspec.GridSpec(3, 2, hspace=0.3, wspace=0.3)
         
-        # Try LIME
-        try:
-            lime_exp, lime_viz = apply_lime(
-                model, original_image, 
-                target_class=pred_class, device=device
-            )
-            
-            plt.subplot(2, 2, 3)
-            plt.imshow(lime_viz)
-            plt.title("LIME Explanation")
-            plt.axis('off')
-            
-            lime_description = (
-                "LIME (Local Interpretable Model-agnostic Explanations) perturbs the "
-                "input image by segmenting it and turning segments on or off. "
-                "It then fits a simple model to approximate how the segments "
-                "affect the model's prediction. Green regions positively "
-                "contribute to the prediction, while red regions negatively contribute."
-            )
-            
-            plt.figtext(0.1, 0.25, "LIME Explanation:", fontsize=12, weight='bold')
-            plt.figtext(0.1, 0.2, lime_description, fontsize=10, wrap=True)
-            
-        except Exception as e:
-            print(f"Error applying LIME for report: {e}")
-            plt.subplot(2, 2, 3)
-            plt.text(0.5, 0.5, "LIME explanation\nnot available", 
-                    ha='center', va='center', transform=plt.gca().transAxes)
-            plt.axis('off')
+        # Original image
+        ax1 = plt.subplot(gs[0, 0])
+        ax1.imshow(original_image)
+        ax1.set_title("Original Image")
+        ax1.axis('off')
         
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
-        pdf.savefig()
-        plt.close()
+        # Add available explanation methods
+        methods = [
+            ('gradcam', gs[0, 1]),
+            ('lime', gs[1, 0]),
+            ('integrated_gradients', gs[1, 1]),
+            ('cam', gs[2, 0]),
+            ('shap', gs[2, 1])
+        ]
         
-        # Explanations page 2 - Integrated Gradients and CAM
-        plt.figure(figsize=(8.5, 11))
-        plt.suptitle("Explanation Methods - Part 2", fontsize=16, y=0.98)
-        
-        # Try Integrated Gradients
-        try:
-            ig_attrs = apply_integrated_gradients(
-                model, image_tensor, original_image,
-                target_class=pred_class, device=device
-            )
-            
-            # Create a visualization using the attribution map
-            cmap = plt.get_cmap(COLORMAP)
-            ig_heatmap = cmap(ig_attrs)[:, :, :3]
-            
-            # Resize to match original image
-            ig_heatmap_resized = cv2.resize(
-                ig_heatmap, (original_image.shape[1], original_image.shape[0])
-            )
-            
-            # Create overlay
-            ig_overlay = (1 - OVERLAY_ALPHA) * original_image + OVERLAY_ALPHA * ig_heatmap_resized
-            ig_overlay = np.clip(ig_overlay, 0, 1)
-            
-            plt.subplot(2, 2, 1)
-            plt.imshow(ig_overlay)
-            plt.title("Integrated Gradients Explanation")
-            plt.axis('off')
-            
-            plt.subplot(2, 2, 2)
-            plt.imshow(ig_attrs, cmap=COLORMAP)
-            plt.title("IG Attribution Map")
-            plt.axis('off')
-            
-            ig_description = (
-                "Integrated Gradients computes the path integral of the gradients "
-                "along a straight line from a baseline image (usually black) to "
-                "the input image. This provides a pixel-level attribution map "
-                "showing the contribution of each pixel to the prediction."
-            )
-            
-            plt.figtext(0.1, 0.55, "Integrated Gradients Explanation:", fontsize=12, weight='bold')
-            plt.figtext(0.1, 0.5, ig_description, fontsize=10, wrap=True)
-            
-        except Exception as e:
-            print(f"Error applying Integrated Gradients for report: {e}")
-            plt.subplot(2, 2, 1)
-            plt.text(0.5, 0.5, "Integrated Gradients\nexplanation not available", 
-                    ha='center', va='center', transform=plt.gca().transAxes)
-            plt.axis('off')
-            
-            plt.subplot(2, 2, 2)
-            plt.axis('off')
-        
-        # Try CAM
-        try:
-            cam_heatmap, cam_overlay = apply_cam(
-                model, image_tensor, original_image,
-                target_class=pred_class, device=device
-            )
-            
-            plt.subplot(2, 2, 3)
-            plt.imshow(cam_overlay)
-            plt.title("Class Activation Mapping")
-            plt.axis('off')
-            
-            plt.subplot(2, 2, 4)
-            plt.imshow(cam_heatmap, cmap=COLORMAP)
-            plt.title("CAM Heatmap")
-            plt.axis('off')
-            
-            cam_description = (
-                "Class Activation Mapping (CAM) visualizes the class-specific "
-                "feature maps in the last convolutional layer. It shows which "
-                "regions of the image were most important for the model's "
-                "prediction of the specific class."
-            )
-            
-            plt.figtext(0.1, 0.25, "Class Activation Mapping Explanation:", fontsize=12, weight='bold')
-            plt.figtext(0.1, 0.2, cam_description, fontsize=10, wrap=True)
-            
-        except Exception as e:
-            print(f"Error applying CAM for report: {e}")
-            plt.subplot(2, 2, 3)
-            plt.text(0.5, 0.5, "CAM explanation\nnot available", 
-                    ha='center', va='center', transform=plt.gca().transAxes)
-            plt.axis('off')
-            
-            plt.subplot(2, 2, 4)
-            plt.axis('off')
+        for method, position in methods:
+            ax = plt.subplot(position)
+            if method in explanations and explanations[method] is not None:
+                ax.imshow(explanations[method]['image'])
+                ax.set_title(explanations[method]['title'])
+            else:
+                method_name = method.replace('_', ' ').title()
+                ax.text(0.5, 0.5, f"{method_name}\nNot Available", 
+                       ha='center', va='center', transform=ax.transAxes)
+            ax.axis('off')
         
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         pdf.savefig()
@@ -590,7 +852,7 @@ def generate_clinical_report(model, image_tensor, original_image, original_path=
         
         # Final page with disclaimer
         plt.figure(figsize=(8.5, 11))
-        plt.suptitle("Important Information", fontsize=16, y=0.98)
+        plt.suptitle("Important Information", fontsize=16, y=0.99)
         
         disclaimer_text = (
             "DISCLAIMER:\n\n"
@@ -607,7 +869,7 @@ def generate_clinical_report(model, image_tensor, original_image, original_path=
             "detection and proper medical assessment are crucial for skin cancer diagnosis and treatment."
         )
         
-        plt.figtext(0.1, 0.9, disclaimer_text, fontsize=12, wrap=True)
+        plt.figtext(0.1, 0.7, disclaimer_text, fontsize=12, wrap=True)
         
         about_model_text = (
             "About the Model:\n\n"
@@ -622,6 +884,7 @@ def generate_clinical_report(model, image_tensor, original_image, original_path=
         
         plt.figtext(0.1, 0.4, about_model_text, fontsize=12, wrap=True)
         
+        plt.axis('off')
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         pdf.savefig()
         plt.close()

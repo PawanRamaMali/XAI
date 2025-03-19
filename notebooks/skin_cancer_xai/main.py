@@ -9,6 +9,7 @@ evaluation, and explainability visualizations.
 import os
 import argparse
 import torch
+import numpy as np
 
 # Import project modules
 from config import (
@@ -88,6 +89,7 @@ def main():
     """Main execution function."""
     # Parse arguments
     args = parse_args()
+    import numpy as np
     
     # Set random seed
     torch.manual_seed(args.seed)
