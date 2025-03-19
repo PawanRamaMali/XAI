@@ -225,12 +225,29 @@ def main():
         
         print(f"Using image with predicted class: {class_names[example_class]}")
         
-        # Apply Grad-CAM
-        print("\nApplying Grad-CAM...")
-        gradcam_heatmap, gradcam_overlay = apply_gradcam(
-            model, example_img_tensor, example_img_np, 
-            target_class=example_class, device=device
-        )
+        # # Apply Grad-CAM
+        # print("\nApplying Grad-CAM...")
+        # gradcam_heatmap, gradcam_overlay = apply_gradcam(
+        #     model, example_img_tensor, example_img_np, 
+        #     target_class=example_class, device=device
+        # )
+
+        try:
+            # Try Grad-CAM first
+            print("\nApplying Grad-CAM...")
+            gradcam_heatmap, gradcam_overlay = apply_gradcam(
+                model, example_img_tensor, example_img_np, 
+                target_class=example_class
+            )
+        except Exception as e:
+            # Fall back to occlusion map if Grad-CAM fails
+            print(f"Grad-CAM failed with error: {e}")
+            print("Falling back to occlusion-based visualization...")
+            from explanation.gradcam import simple_occlusion_map
+            gradcam_heatmap, gradcam_overlay = simple_occlusion_map(
+                model, example_img_tensor, example_img_np,
+                target_class=example_class
+            )
         
         # Apply LIME
         print("\nApplying LIME...")

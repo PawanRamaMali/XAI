@@ -3,3 +3,4 @@
 /notebooks/skin_cancer_xai/data
 *.pyc
 *.pyc
+/notebooks/skin_cancer_xai/explanation/__pycache__
