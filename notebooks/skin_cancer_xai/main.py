@@ -21,6 +21,7 @@ from models.cnn_model import create_model, load_model, print_model_summary
 from training.train import train_model, fine_tune_model, save_training_history
 from training.evaluate import evaluate_and_save_results
 from explanation.gradcam import apply_gradcam
+from explanation.captum_gradcam import apply_captum_gradcam
 from explanation.lime_explainer import apply_lime
 from explanation.integrated_gradients import apply_integrated_gradients
 from explanation.shap_explainer import apply_shap
@@ -204,7 +205,7 @@ def main():
             # Get a sample image from the validation set
             for batch in val_loader:
                 inputs, labels = batch
-                example_img_tensor = inputs[0].unsqueeze(0)
+                example_img_tensor = inputs[0].unsqueeze(0)  # This creates the image tensor
                 example_class = labels[0].item()
                 # Convert tensor to numpy image for visualization
                 from data.dataset import get_inverse_transform
@@ -215,7 +216,7 @@ def main():
                 break
         else:
             # Load provided example image
-            original_img, example_img_tensor = load_single_image(example_img_path)
+            original_img, example_img_tensor = load_single_image(example_img_path)  # Creates image tensor
             example_img_np = np.array(original_img) / 255.0
             
             # Get prediction
@@ -232,23 +233,32 @@ def main():
         #     target_class=example_class, device=device
         # )
 
-        try:
-            # Try Grad-CAM first
-            print("\nApplying Grad-CAM...")
-            gradcam_heatmap, gradcam_overlay = apply_gradcam(
-                model, example_img_tensor, example_img_np, 
-                target_class=example_class
-            )
-        except Exception as e:
-            # Fall back to occlusion map if Grad-CAM fails
-            print(f"Grad-CAM failed with error: {e}")
-            print("Falling back to occlusion-based visualization...")
-            from explanation.gradcam import simple_occlusion_map
-            gradcam_heatmap, gradcam_overlay = simple_occlusion_map(
-                model, example_img_tensor, example_img_np,
-                target_class=example_class
-            )
-        
+        # try:
+        #     # Try Grad-CAM first
+        #     print("\nApplying Grad-CAM...")
+        #     gradcam_heatmap, gradcam_overlay = apply_gradcam(
+        #         model, example_img_tensor, example_img_np, 
+        #         target_class=example_class
+        #     )
+        # except Exception as e:
+        #     # Fall back to occlusion map if Grad-CAM fails
+        #     print(f"Grad-CAM failed with error: {e}")
+        #     print("Falling back to occlusion-based visualization...")
+        #     from explanation.gradcam import simple_occlusion_map
+        #     gradcam_heatmap, gradcam_overlay = simple_occlusion_map(
+        #         model, example_img_tensor, example_img_np,
+        #         target_class=example_class
+        #     )
+
+        # With the new Captum-based implementation:
+
+        print("\nApplying New Grad-CAM...")
+        # New code
+        captum_heatmap, captum_overlay = apply_captum_gradcam(
+            model, example_img_tensor, example_img_np, 
+            target_class=example_class, device=device
+        )
+
         # Apply LIME
         print("\nApplying LIME...")
         lime_exp, lime_viz = apply_lime(

@@ -1,8 +1,8 @@
 """
-Fixed implementation for clinical report generation for skin cancer classification.
+Updated clinical_report.py to use Captum-based Grad-CAM implementation.
 
-This module contains functions to generate a comprehensive clinical report
-and compare different explanation methods for interpretability.
+This module integrates the Captum-based Grad-CAM implementation into the
+clinical report generation pipeline for better explainability.
 """
 
 import os
@@ -20,8 +20,8 @@ import sys
 sys.path.append('..')
 from config import OUTPUT_DIR, DPI, COLORMAP, OVERLAY_ALPHA
 
-# Fix the import statements to use the modified implementations if necessary
-from explanation.gradcam import apply_gradcam
+# Import the Captum-based Grad-CAM implementation
+from explanation.captum_gradcam import apply_captum_gradcam
 from explanation.lime_explainer import apply_lime
 from explanation.integrated_gradients import apply_integrated_gradients
 from explanation.shap_explainer import apply_shap
@@ -69,20 +69,20 @@ def compare_explanations(model, image_tensor, original_image, target_class=None,
     plt.title(f"Original Image\nClass: {target_class} ({confidence:.2f})")
     plt.axis('off')
     
-    # Try Grad-CAM
+    # Try Captum Grad-CAM (our new implementation)
     try:
-        print("Applying Grad-CAM for comparison...")
-        gradcam_heatmap, gradcam_overlay = apply_gradcam(
+        print("Applying Captum Grad-CAM for comparison...")
+        gradcam_heatmap, gradcam_overlay = apply_captum_gradcam(
             model, image_tensor, original_image, 
             target_class=target_class, device=device
         )
         
         plt.subplot(2, 3, 2)
         plt.imshow(gradcam_overlay)
-        plt.title("Grad-CAM")
+        plt.title("Captum Grad-CAM")
         plt.axis('off')
     except Exception as e:
-        print(f"Error applying Grad-CAM for comparison: {e}")
+        print(f"Error applying Captum Grad-CAM for comparison: {e}")
         plt.subplot(2, 3, 2)
         plt.text(0.5, 0.5, "Grad-CAM not available", 
                  ha='center', va='center', transform=plt.gca().transAxes)
@@ -305,9 +305,9 @@ def generate_clinical_report(model, image_tensor, original_image, original_path=
         for i, prob in enumerate(top_probs):
             ax2.text(prob + 0.01, i, f"{prob:.2f}", va='center')
         
-        # Try to get Grad-CAM explanation
+        # Try to get Captum Grad-CAM explanation
         try:
-            gradcam_heatmap, gradcam_overlay = apply_gradcam(
+            gradcam_heatmap, gradcam_overlay = apply_captum_gradcam(
                 model, image_tensor, original_image, 
                 target_class=pred_class, device=device
             )
@@ -317,7 +317,7 @@ def generate_clinical_report(model, image_tensor, original_image, original_path=
             ax3.set_title("Grad-CAM Explanation")
             ax3.axis('off')
         except Exception as e:
-            print(f"Error applying Grad-CAM: {e}")
+            print(f"Error applying Captum Grad-CAM: {e}")
             ax3 = plt.subplot(gs[1, 0])
             ax3.text(0.5, 0.5, "Grad-CAM explanation\nnot available", 
                     ha='center', va='center', transform=ax3.transAxes)
@@ -422,16 +422,16 @@ def generate_clinical_report(model, image_tensor, original_image, original_path=
         plt.figure(figsize=(8.5, 11))
         plt.suptitle("Explanation Methods - Part 1", fontsize=16, y=0.98)
         
-        # Try Grad-CAM
+        # Try Captum Grad-CAM
         try:
-            gradcam_heatmap, gradcam_overlay = apply_gradcam(
+            gradcam_heatmap, gradcam_overlay = apply_captum_gradcam(
                 model, image_tensor, original_image, 
                 target_class=pred_class, device=device
             )
             
             plt.subplot(2, 2, 1)
             plt.imshow(gradcam_overlay)
-            plt.title("Grad-CAM Explanation")
+            plt.title("Captum Grad-CAM Explanation")
             plt.axis('off')
             
             plt.subplot(2, 2, 2)
